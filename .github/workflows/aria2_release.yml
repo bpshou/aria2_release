@@ -1,0 +1,76 @@
+name: aria2-release
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  download:
+    name: Download Resource
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install software
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            jq \
+            curl \
+            unzip \
+            zip
+          mkdir -p aria2_download
+
+      - name: Download aria2
+        run: |
+          ARIA2_DOWNLOAD=`curl -s https://api.github.com/repos/aria2/aria2/releases/latest | jq -r '.assets[].browser_download_url' | grep '.tar.gz'`
+          curl -fsSL $ARIA2_DOWNLOAD -O
+          tar -zxvf $(ls | grep '.tar.gz') -C aria2_download
+          mv ./aria2_download/$(ls aria2_download | grep 'aria2-') ./aria2_download/aria2
+
+      - name: Download aria2.conf
+        run: |
+          ARIA2_CONF_DOWNLOAD=https://raw.githubusercontent.com/P3TERX/aria2.conf/master/aria2.conf
+          curl -fsSL $ARIA2_CONF_DOWNLOAD -O
+          mv aria2.conf ./aria2_download/
+
+      - name: Download AriaNg
+        run: |
+          WEBUI_ARIA2_DOWNLOAD=`curl -s https://api.github.com/repos/mayswind/AriaNg/releases/latest | jq -r '.assets[].browser_download_url' | grep 'AllInOne'`
+          curl -fsSL $WEBUI_ARIA2_DOWNLOAD -O
+          ZIP_NAME=`ls | grep 'AllInOne'`
+          unzip $ZIP_NAME -d ./aria2_download/AriaNg
+
+      - name: Download webui-aria2
+        run: |
+          WEBUI_ARIA2_DOWNLOAD=https://github.com/ziahamza/webui-aria2/archive/refs/heads/master.zip
+          curl -fsSL $WEBUI_ARIA2_DOWNLOAD -O
+          unzip master.zip
+          mv $(ls | grep webui-aria2)/docs ./aria2_download/webui-aria2
+
+      - name: Complete Build
+        run: |
+          sudo zip -r aria2_download.zip ./aria2_download
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v1.0.0
+          release_name: Release v1.0.0
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./aria2_download.zip
+          asset_name: aria2_download.zip
+          asset_content_type: application/zip
+          
